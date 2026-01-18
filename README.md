@@ -457,6 +457,11 @@ wrangler tail
    - Add validation for extracted data
    - Support custom theme lists
 
+6. **External Integrations & Notifications**:
+   - **Slack Notifications**: Send message to Slack if issue is critical (based on `urgency: 'critical'`)
+   - Webhook support for other notification services
+   - Configurable notification rules and thresholds
+
 ## Integration with Aggregator Worker
 
 The workflow worker is designed to be called by the aggregator worker:
