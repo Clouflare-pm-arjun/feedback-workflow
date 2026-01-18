@@ -1,0 +1,260 @@
+openapi: 3.0.3
+info:
+  title: Feedback Workflow API
+  description: |
+    API for processing feedback using Cloudflare AI to extract themes, urgency, value, and sentiment.
+    The processed feedback is then stored in R2 storage for downstream analysis.
+  version: 1.0.0
+  contact:
+    name: Feedback Workflow Service
+
+servers:
+  - url: https://feedback-workflow.arjunchangeeacharya1998.workers.dev
+    description: Production server
+  - url: http://localhost:8787
+    description: Local development server
+
+tags:
+  - name: Processing
+    description: Feedback processing operations
+  - name: Health
+    description: Health check endpoints
+  - name: Queue
+    description: Queue status and monitoring
+
+paths:
+  /process:
+    post:
+      tags:
+        - Processing
+      summary: Queue feedback for processing
+      description: |
+        Accepts feedback from the aggregator worker and queues it for processing.
+        The feedback will be processed asynchronously using Cloudflare AI to extract
+        themes, urgency, value, and sentiment, then stored in R2.
+      operationId: processFeedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Feedback'
+            examples:
+              support_feedback:
+                summary: Customer Support Feedback
+                value:
+                  id: fb-1234567890-abc123
+                  source: support
+                  source_id: TICKET-12345
+                  title: Slow API response times
+                  content: We are experiencing very slow response times from the API, especially during peak hours.
+                  author: john.doe@company.com
+                  author_email: john.doe@company.com
+                  status: pending
+                  metadata:
+                    priority: high
+                    category: performance
+                  created_at: 1704067200
+                  updated_at: 1704067200
+              github_feedback:
+                summary: GitHub Issue Feedback
+                value:
+                  id: fb-1234567891-def456
+                  source: github
+                  source_id: github-issue-456
+                  title: Memory leak in worker initialization
+                  content: We have identified a memory leak that occurs during worker initialization in production.
+                  author: github-user-1
+                  author_email: dev@example.com
+                  status: pending
+                  metadata:
+                    repo: cloudflare/workers
+                    issue_number: 456
+                  created_at: 1704067300
+                  updated_at: 1704067300
+      responses:
+        '200':
+          description: Feedback successfully queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check if the service is running
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /queue/status:
+    get:
+      tags:
+        - Queue
+      summary: Get queue status
+      description: Get current queue length and operational status
+      operationId: getQueueStatus
+      responses:
+        '200':
+          description: Queue status information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStatusResponse'
+
+  /docs:
+    get:
+      tags:
+        - Documentation
+      summary: API Documentation
+      description: Swagger UI for API documentation
+      operationId: getDocs
+      responses:
+        '200':
+          description: Swagger UI HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /openapi.yaml:
+    get:
+      tags:
+        - Documentation
+      summary: OpenAPI Specification
+      description: OpenAPI 3.0.3 specification in YAML format
+      operationId: getOpenAPISpec
+      responses:
+        '200':
+          description: OpenAPI specification
+          content:
+            application/x-yaml:
+              schema:
+                type: string
+
+components:
+  schemas:
+    Feedback:
+      type: object
+      required:
+        - id
+        - source
+        - content
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: Unique feedback identifier
+          example: fb-1234567890-abc123
+        source:
+          type: string
+          enum: [support, discord, github, email, twitter, forum]
+          description: Source system where feedback originated
+        source_id:
+          type: string
+          description: Original ID from the source system
+          example: TICKET-12345
+        title:
+          type: string
+          description: Feedback title or subject
+          example: Slow API response times
+        content:
+          type: string
+          description: Feedback content
+          example: We are experiencing very slow response times from the API
+        author:
+          type: string
+          description: Username or identifier of the feedback author
+          example: john.doe@company.com
+        author_email:
+          type: string
+          format: email
+          description: Email address of the feedback author
+          example: john.doe@company.com
+        status:
+          type: string
+          enum: [pending, processing, processed]
+          default: pending
+          description: Processing status of the feedback
+        metadata:
+          type: object
+          description: Source-specific metadata
+          additionalProperties: true
+          example:
+            priority: high
+            category: performance
+        created_at:
+          type: integer
+          description: Unix timestamp when feedback was created
+          example: 1704067200
+        updated_at:
+          type: integer
+          description: Unix timestamp when feedback was last updated
+          example: 1704067200
+
+    ProcessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Feedback queued for processing
+        queueLength:
+          type: integer
+          description: Current queue length after adding this item
+          example: 1
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: feedback-workflow
+
+    QueueStatusResponse:
+      type: object
+      properties:
+        queueLength:
+          type: integer
+          description: Current number of items in the queue
+          example: 5
+        status:
+          type: string
+          example: operational
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid feedback data. Required: id, content, source"
+        details:
+          type: string
+          description: Additional error details
